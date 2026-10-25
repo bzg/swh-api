@@ -1,0 +1,12 @@
+{:paths ["test"]
+ ;; the library itself, with its deps.edn dependencies (swhid)
+ :deps {io.github.bzg/swh-api {:local/root "."}}
+ :tasks
+ {test
+  {:doc "Run the test suite under Babashka"
+   :requires ([clojure.test :as t])
+   :task (do
+           (require 'swh.api.v1-test)
+           (let [{:keys [fail error]}
+                 (t/run-tests 'swh.api.v1-test)]
+             (System/exit (if (pos? (+ fail error)) 1 0))))}}}

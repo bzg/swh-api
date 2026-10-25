@@ -1,0 +1,75 @@
+#+title: swh-api
+#+options: toc:nil num:nil
+
+A Clojure client for the [[https://archive.softwareheritage.org/api/1/][Software Heritage Web API]]: it can check
+whether SWHIDs are archived (=known=), resolve them, check when an
+origin was last archived (=latest-visit=) and trigger /save code now/
+requests.
+
+It is a companion to [[https://github.com/bzg/swhid-clj][swhid-clj]], which computes SWHIDs offline.
+
+It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
+
+* Install
+
+#+begin_src clojure
+{:deps {io.github.bzg/swh-api {:mvn/version "0.1.0"}}}
+#+end_src
+
+* Usage
+
+#+begin_src clojure
+(require '[swh.api.v1 :as api] '[swhid.hash :as h])
+
+;; Which of these SWHIDs are in the archive?
+(api/known ["swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2"
+            (h/path-swhid "src")])
+;; => {"swh:1:cnt:94a9…" true, "swh:1:dir:…" false}
+
+;; Resolve a SWHID into archive metadata (browse URL, …)
+(api/resolve-swhid "swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2")
+
+;; Is this origin archived, and when was it last visited?
+;; nil when the origin is not in the archive.
+(:date (api/latest-visit "https://github.com/bzg/swhid-clj"))
+(api/visits "https://github.com/bzg/swhid-clj" {:per-page 10}) ; most recent first
+
+;; Ask the archive to save a public repository now
+(api/save-code-now! "https://github.com/bzg/swhid-clj")
+(api/save-requests "https://github.com/bzg/swhid-clj") ; their statuses
+
+;; Options, on any call: {:token "…"} (higher rate limits),
+;; {:base-url "…"} (another instance), {:timeout-ms n} (60 s by default).
+#+end_src
+
+Anonymous calls are rate-limited (~120/h). =known= sends its SWHIDs in
+batches of 1000 per request; when a batch fails with an HTTP error
+(e.g. a 429), the results of the previous batches are under =:partial=
+in the metadata of the =ex-data=: =(:partial (meta (ex-data e)))=.
+
+The rate-limit state returned by the archive is available in the
+metadata of the result when it is a map or a vector (a =nil= result
+carries none), and in the =ex-data= of HTTP errors:
+
+#+begin_src clojure
+(:rate-limit (meta (api/resolve-swhid "swh:1:cnt:94a9…")))
+;; => {:limit 120, :remaining 117, :reset 1790000000} ; reset: epoch seconds
+#+end_src
+
+Read it before transforming the result: =map=, =filter=, =into=… drop
+metadata. Quotas are per scope on the archive side: the one reported
+by =save-code-now!= is not the one reported by =known=.
+
+* Tests
+
+#+begin_src shell
+bb test           # Babashka
+clojure -X:test   # JVM
+SWH_API_TESTS=1 bb test  # also hit the real archive
+#+end_src
+
+* License
+
+Copyright © 2026 Bastien Guerry
+
+The code is distributed under the Eclipse Public License 2.0.
