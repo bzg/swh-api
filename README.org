@@ -3,8 +3,8 @@
 
 A Clojure client for the [[https://archive.softwareheritage.org/api/1/][Software Heritage Web API]]: it can check
 whether SWHIDs are archived (=known=), resolve them, check when an
-origin was last archived (=latest-visit=) and trigger /save code now/
-requests.
+origin was last archived (=latest-visit=), tell where the archive found
+an artifact (=whereis=) and trigger /save code now/ requests.
 
 It is a companion to [[https://github.com/bzg/swhid-clj][swhid-clj]], which computes SWHIDs offline.
 
@@ -13,7 +13,7 @@ It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
 * Install
 
 #+begin_src clojure
-{:deps {io.github.bzg/swh-api {:mvn/version "0.1.0"}}}
+{:deps {io.github.bzg/swh-api {:mvn/version "0.1.1"}}}
 #+end_src
 
 * Usage
@@ -28,6 +28,10 @@ It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
 
 ;; Resolve a SWHID into archive metadata (browse URL, …)
 (api/resolve-swhid "swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2")
+
+;; Where did the archive find it? A qualified SWHID (origin, anchor),
+;; nil when it knows none. Needs an account with the provenance permission.
+(api/whereis "swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2" {:token "…"})
 
 ;; Is this origin archived, and when was it last visited?
 ;; nil when the origin is not in the archive.

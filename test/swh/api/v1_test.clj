@@ -279,6 +279,20 @@
                   ";origin=https://example.org/a%253Bb%3Fx=1;path=/a%255Bb%255D/")
              (:uri (last @calls)))))))
 
+(deftest whereis-test
+  (let [calls (atom [])
+        found (str cnt ";origin=https://example.org/lib;anchor=swh:1:rel:"
+                   (apply str (repeat 40 "1")))]
+    (is (= found (api/whereis (str cnt ";lines=1-2")
+                              {:request (fake calls (json-response found))})))
+    (is (= (str api/default-base-url "/provenance/whereis/" cnt "/")
+           (:uri (first @calls)))
+        "the qualifiers are dropped")
+    (testing "nil when the archive knows no provenance"
+      (is (nil? (api/whereis cnt {:request (fake calls {:status 200 :headers {} :body "null"})}))))
+    (testing "the permission is required"
+      (is (= 403 (:status (ex-data (caught (api/whereis cnt {:request (fake calls {:status 403 :headers {} :body ""})})))))))))
+
 ;; The pure parts, called directly: no HTTP, no :request hook.
 (deftest pure-functions-test
   (testing "request-map"
