@@ -22,7 +22,7 @@
                 :scm {:url "https://github.com/bzg/swh-api"
                       :connection "scm:git:git://github.com/bzg/swh-api.git"
                       :developerConnection "scm:git:ssh://git@github.com/bzg/swh-api.git"
-                      :tag (str "v" version)}
+                      :tag version}
                 :pom-data [[:description "Client for the Software Heritage Web API"]
                            [:url "https://github.com/bzg/swh-api"]
                            [:licenses
