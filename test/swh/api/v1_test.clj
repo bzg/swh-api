@@ -294,69 +294,15 @@
     (testing "the permission is required"
       (is (= 403 (:status (ex-data (caught (api/whereis cnt {:request (fake calls {:status 403 :headers {} :body ""})})))))))))
 
-;; The pure parts, called directly: no HTTP, no :request hook.
-(deftest pure-functions-test
-  (testing "request-map"
-    (is (= {:method :post
-            :uri "https://swh.example/api/1/known/"
-            :headers {"Accept" "application/json"
-                      "Content-Type" "application/json"
-                      "Authorization" "Bearer t"}
-            :body "[\"x\"]"
-            :timeout 5
-            :throw false}
-           (#'api/request-map {:base-url "https://swh.example/api/1" :token "t" :timeout-ms 5}
-                              :post "/known/" ["x"])))
-    (is (= {:method :get
-            :uri (str api/default-base-url "/x/")
-            :headers {"Accept" "application/json"}
-            :body nil
-            :timeout api/default-timeout-ms
-            :throw false}
-           (#'api/request-map nil :get "/x/" nil))))
-  (testing "parse-response"
-    (let [r (#'api/parse-response {:status 200
-                                   :headers {"x-ratelimit-remaining" "3"}
-                                   :body "{\"a\":1}"}
-                                  "/p/" true)]
-      (is (= {:a 1} r))
-      (is (= {:remaining 3} (:rate-limit (meta r)))))
-    (is (= {"a" 1} (#'api/parse-response {:status 200 :body "{\"a\":1}"} "/p/" false)))
-    (let [e (caught (#'api/parse-response {:status 503 :body "down"} "/p/" true))]
-      (is (= {:status 503 :path "/p/" :body "down"} (ex-data e)))))
-  (testing "known-batches"
-    (is (= [1000 1] (map count (#'api/known-batches (cnt-ids 1001))))
-        "1000 per batch")
-    (is (= [[cnt]] (#'api/known-batches [(str cnt ";origin=https://example.org")]))))
-  (testing "add-known"
-    (let [acc (#'api/add-known {dir false} [cnt (first (cnt-ids 1))]
-                               (with-meta {cnt {"known" true}} {:rate-limit {:limit 1}}))]
-      (is (= {dir false cnt true (first (cnt-ids 1)) false} acc))
-      (is (= {:limit 1} (:rate-limit (meta acc)))))
-    (is (thrown? clojure.lang.ExceptionInfo (#'api/add-known {} [cnt] nil))))
-  (testing "with-partial"
-    (let [e (ex-info "boom" {:status 500})
-          e' (#'api/with-partial e {cnt true})]
-      (is (= "boom" (ex-message e')))
-      (is (= {:status 500} (ex-data e')))
-      (is (= {cnt true} (:partial (meta (ex-data e')))))
-      (is (identical? e (ex-cause e')))))
-  (testing "path-encode"
-    (is (= "https://h.example:80/a-b_c.d~e/!$&'()*+,;=@x"
-           (#'api/path-encode "https://h.example:80/a-b_c.d~e/!$&'()*+,;=@x"))
-        "pchar and / stay raw")
-    (is (= "%25%3F%23%20%5B%5D%7C%22%3C%3E%5C%5E%60%7B%7D"
-           (#'api/path-encode "%?# []|\"<>\\^`{}")))
-    (is (= "caf%C3%A9-%F0%9F%A6%8A" (#'api/path-encode "café-🦊"))
-        "non-ASCII as UTF-8, astral code points whole"))
-  (testing "paths"
-    (let [o "https://github.com/bzg/swhid-clj"]
-      (is (= (str "/resolve/" cnt "/") (#'api/resolve-path cnt)))
-      (is (= (str "/origin/" o "/visit/latest/?require_snapshot=true")
-             (#'api/latest-visit-path o true)))
-      (is (= (str "/origin/" o "/visit/latest/") (#'api/latest-visit-path o false)))
-      (is (= (str "/origin/" o "/visits/?per_page=5") (#'api/visits-path o 5)))
-      (is (= (str "/origin/save/hg/url/" o "/") (#'api/save-path "hg" o))))))
+;; The one pure part the tests through :request do not cover.
+(deftest path-encode-test
+  (is (= "https://h.example:80/a-b_c.d~e/!$&'()*+,;=@x"
+         (#'api/path-encode "https://h.example:80/a-b_c.d~e/!$&'()*+,;=@x"))
+      "pchar and / stay raw")
+  (is (= "%25%3F%23%20%5B%5D%7C%22%3C%3E%5C%5E%60%7B%7D"
+         (#'api/path-encode "%?# []|\"<>\\^`{}")))
+  (is (= "caf%C3%A9-%F0%9F%A6%8A" (#'api/path-encode "café-🦊"))
+      "non-ASCII as UTF-8, astral code points whole"))
 
 ;; Integration tests against the real archive; run with SWH_API_TESTS=1.
 (deftest ^:integration integration-test

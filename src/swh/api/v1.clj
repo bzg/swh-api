@@ -28,6 +28,10 @@
 
 (def default-base-url "https://archive.softwareheritage.org/api/1")
 
+(def default-timeout-ms
+  "How long a request may take, in milliseconds."
+  60000)
+
 (defn- parse-body [body keywordize?]
   (when-not (str/blank? body)
     ;; strict: a top-level JSON array is a vector, not a lazy seq
@@ -50,10 +54,6 @@
                  (when-let [v (header-long headers (str "x-ratelimit-" (name k)))]
                    [k v])))
          [:limit :remaining :reset])))
-
-(def default-timeout-ms
-  "How long a request may take, in milliseconds."
-  60000)
 
 (defn- request-map
   "The HTTP request for `method` on `path` with JSON `body` (nil for none)."
@@ -141,12 +141,6 @@
 ;; API limit on /known/.
 (def ^:private known-batch-size 1000)
 
-(defn- known-batches
-  "Core SWHID strings of `swhids`, by batches of the API size;
-  throws on an invalid SWHID."
-  [swhids]
-  (partition-all known-batch-size (mapv swhid-str swhids)))
-
 (defn- add-known
   "`acc` with the answer of /known/ `resp` for the SWHIDs of `batch`, and
   the metadata (rate limit) of `resp`."
@@ -172,7 +166,8 @@
   :rate-limit metadata is the latest one received. When a batch fails
   with an HTTP error, the results of the previous batches are under
   :partial in the metadata of the ex-data (not in the ex-data itself,
-  which gets printed with the exception)."
+  which gets printed with the exception); an IOException goes through
+  as is, without them."
   ([swhids] (known swhids nil))
   ([swhids opts]
    (reduce
@@ -183,7 +178,8 @@
         (catch clojure.lang.ExceptionInfo e
           (throw (with-partial e acc)))))
     {}
-    (known-batches swhids))))
+    ;; core SWHID strings; throws on an invalid one before any request
+    (partition-all known-batch-size (mapv swhid-str swhids)))))
 
 (defn- resolve-path
   "Path resolving `swhid` (string or map, qualifiers allowed)."
