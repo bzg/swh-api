@@ -289,7 +289,8 @@
            (:uri (first @calls)))
         "the qualifiers are dropped")
     (testing "nil when the archive knows no provenance"
-      (is (nil? (api/whereis cnt {:request (fake calls {:status 200 :headers {} :body "null"})}))))
+      (is (nil? (api/whereis cnt {:request (fake calls {:status 200 :headers {} :body "null"})})))
+      (is (nil? (api/whereis cnt {:request (fake calls {:status 404 :headers {} :body ""})}))))
     (testing "the permission is required"
       (is (= 403 (:status (ex-data (caught (api/whereis cnt {:request (fake calls {:status 403 :headers {} :body ""})})))))))))
 

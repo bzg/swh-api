@@ -201,11 +201,12 @@
   "Where the archive found the artifact `swhid` (string or map; its
   qualifiers are dropped): a qualified SWHID string whose :origin and
   :anchor qualifiers name an origin and the release or revision holding
-  it there; nil when the archive knows none. The provenance API needs
-  an account with a special permission (a 401 or 403 otherwise)."
+  it there; nil when the archive knows none (it answers null, or a
+  404). The provenance API needs an account with a special permission
+  (a 401 or 403 otherwise)."
   ([swhid] (whereis swhid nil))
   ([swhid opts]
-   (request opts :get (str "/provenance/whereis/" (swhid-str swhid) "/") nil)))
+   (unless-404 #(request opts :get (str "/provenance/whereis/" (swhid-str swhid) "/") nil))))
 
 (defn- latest-visit-path [origin-url require-snapshot?]
   (str "/origin/" (path-encode origin-url) "/visit/latest/"
