@@ -13,7 +13,7 @@ It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
 * Install
 
 #+begin_src clojure
-{:deps {io.github.bzg/swh-api {:mvn/version "0.1.1"}}}
+{:deps {io.github.bzg/swh-api {:mvn/version "0.2.0"}}}
 #+end_src
 
 * Usage
