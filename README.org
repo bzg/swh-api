@@ -13,7 +13,7 @@ It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
 * Install
 
 #+begin_src clojure
-{:deps {io.github.bzg/swh-api {:mvn/version "0.2.1"}}}
+{:deps {io.github.bzg/swh-api {:mvn/version "0.2.2"}}}
 #+end_src
 
 * Usage
@@ -32,6 +32,9 @@ It runs on the JVM (Clojure ≥ 1.11) and [[https://babashka.org][Babashka]].
 ;; Where did the archive find it? A qualified SWHID (origin, anchor),
 ;; nil when it knows none. Needs an account with the provenance permission.
 (api/whereis "swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2" {:token "…"})
+
+;; The same for many at once: {swhid qualified-swhid-or-nil}.
+(api/whereare ["swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2"] {:token "…"})
 
 ;; Is this origin archived, and when was it last visited?
 ;; nil when the origin is not in the archive.

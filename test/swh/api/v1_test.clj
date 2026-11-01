@@ -294,6 +294,37 @@
     (testing "the permission is required"
       (is (= 403 (:status (ex-data (caught (api/whereis cnt {:request (fake calls {:status 403 :headers {} :body ""})})))))))))
 
+(deftest whereare-test
+  (let [calls (atom [])
+        found (str cnt ";origin=https://example.org/lib;anchor=swh:1:rel:"
+                   (apply str (repeat 40 "1")))
+        answer (fn [{:keys [body]}]
+                 (let [ids (json/parse-string body)]
+                   (json-response (mapv #(when (= cnt %) found) ids))))]
+    (is (= {cnt found dir nil}
+           (api/whereare [(str cnt ";lines=1-2") dir]
+                         {:request (fn [req] (swap! calls conj req) (answer req))})))
+    (is (= (str api/default-base-url "/provenance/whereare/") (:uri (first @calls))))
+    (is (= [cnt dir] (json/parse-string (:body (first @calls))))
+        "the qualifiers are dropped")
+    (testing "by batches, nothing asked without SWHIDs"
+      (reset! calls [])
+      (is (= 1500 (count (api/whereare (cnt-ids 1500)
+                                       {:request (fn [req] (swap! calls conj req) (answer req))}))))
+      (is (= 2 (count @calls)))
+      (is (= {} (api/whereare [] {:request never}))))
+    (testing "a failed batch keeps the previous ones"
+      (let [replies (atom [(answer {:body (json/generate-string (take 1000 (cnt-ids 1500)))})
+                           {:status 500 :headers {} :body "{}"}])
+            e (caught (api/whereare (cnt-ids 1500)
+                                    {:request (fn [_] (let [r (first @replies)]
+                                                        (swap! replies rest)
+                                                        r))}))]
+        (is (= 500 (:status (ex-data e))))
+        (is (= 1000 (count (:partial (meta (ex-data e))))))))
+    (testing "an answer that does not match the SWHIDs is an error"
+      (is (caught (api/whereare [cnt dir] {:request (fn [_] (json-response [found]))}))))))
+
 ;; The one pure part the tests through :request do not cover.
 (deftest path-encode-test
   (is (= "https://h.example:80/a-b_c.d~e/!$&'()*+,;=@x"

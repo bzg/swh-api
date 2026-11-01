@@ -160,6 +160,21 @@
   [e acc]
   (ex-info (ex-message e) (vary-meta (ex-data e) assoc :partial acc) e))
 
+(defn- post-batches
+  "POST the core SWHIDs of `swhids` to `path` by batches of `size`: the
+  reduction of the answers by `add` (see `add-known`), from {}. Throws
+  on an invalid SWHID before any request; on an HTTP error, with the
+  results so far (see `with-partial`)."
+  [path size add opts swhids]
+  (reduce
+   (fn [acc batch]
+     (try
+       (add acc batch (request (assoc opts :keywordize? false) :post path batch))
+       (catch clojure.lang.ExceptionInfo e
+         (throw (with-partial e acc)))))
+   {}
+   (partition-all size (mapv swhid-str swhids))))
+
 (defn known
   "Which of `swhids` (strings or SWHID maps) are present in the archive?
   Returns {core-swhid-string boolean}. Batches requests by 1000; the
@@ -170,16 +185,7 @@
   as is, without them."
   ([swhids] (known swhids nil))
   ([swhids opts]
-   (reduce
-    (fn [acc batch]
-      (try
-        (add-known acc batch (request (assoc opts :keywordize? false)
-                                      :post "/known/" batch))
-        (catch clojure.lang.ExceptionInfo e
-          (throw (with-partial e acc)))))
-    {}
-    ;; core SWHID strings; throws on an invalid one before any request
-    (partition-all known-batch-size (mapv swhid-str swhids)))))
+   (post-batches "/known/" known-batch-size add-known opts swhids)))
 
 (defn- resolve-path
   "Path resolving `swhid` (string or map, qualifiers allowed)."
@@ -203,6 +209,29 @@
   ([swhid] (whereis swhid nil))
   ([swhid opts]
    (unless-404 #(request opts :get (str "/provenance/whereis/" (swhid-str swhid) "/") nil))))
+
+;; No API limit: the archive takes about 12 s per 1000 SWHIDs, and a
+;; larger batch would come close to the default timeout.
+(def ^:private whereare-batch-size 1000)
+
+(defn- add-whereare
+  "`acc` with the answer of /provenance/whereare/ `resp`, in the order
+  of the SWHIDs of `batch`, and the metadata (rate limit) of `resp`."
+  [acc batch resp]
+  (when-not (and (vector? resp) (= (count batch) (count resp)))
+    (throw (ex-info "SWH API answered /provenance/whereare/ with no matching JSON array"
+                    {:path "/provenance/whereare/" :body resp})))
+  (-> (into acc (map vector batch resp))
+      (vary-meta merge (meta resp))))
+
+(defn whereare
+  "`whereis` for all of `swhids` (strings or SWHID maps) at once:
+  {core-swhid-string qualified-swhid-string-or-nil}. Batches requests
+  by 1000; the :rate-limit metadata and the :partial results of a
+  failure are as in `known`."
+  ([swhids] (whereare swhids nil))
+  ([swhids opts]
+   (post-batches "/provenance/whereare/" whereare-batch-size add-whereare opts swhids)))
 
 (defn- latest-visit-path [origin-url require-snapshot?]
   (str "/origin/" (path-encode origin-url) "/visit/latest/"
