@@ -199,16 +199,29 @@
   ([swhid opts]
    (request opts :get (resolve-path swhid) nil)))
 
+(defn- provenance
+  "The `answer` of the provenance API at `path` when it names an
+  origin, else nil: the archive answers the bare SWHID for an artifact
+  its provenance index does not cover yet. Throws on an answer that is
+  no SWHID."
+  [path answer]
+  (when (try (some-> answer swhid/parse :qualifiers :origin)
+             (catch clojure.lang.ExceptionInfo e
+               (throw (ex-info (str "SWH API answered " path " with no SWHID")
+                               {:path path :body answer} e))))
+    answer))
+
 (defn whereis
   "Where the archive found the artifact `swhid` (string or map; its
   qualifiers are dropped): a qualified SWHID string whose :origin and
   :anchor qualifiers name an origin and the release or revision holding
-  it there; nil when the archive knows none (it answers null, or a
-  404). The provenance API needs an account with a special permission
-  (a 401 or 403 otherwise)."
+  it there; nil when the archive knows none (it answers null, a 404, or
+  the SWHID without an origin). The provenance API needs an account
+  with a special permission (a 401 or 403 otherwise)."
   ([swhid] (whereis swhid nil))
   ([swhid opts]
-   (unless-404 #(request opts :get (str "/provenance/whereis/" (swhid-str swhid) "/") nil))))
+   (let [path (str "/provenance/whereis/" (swhid-str swhid) "/")]
+     (provenance path (unless-404 #(request opts :get path nil))))))
 
 ;; No API limit: the archive takes about 12 s per 1000 SWHIDs, and a
 ;; larger batch would come close to the default timeout.
@@ -221,7 +234,7 @@
   (when-not (and (vector? resp) (= (count batch) (count resp)))
     (throw (ex-info "SWH API answered /provenance/whereare/ with no matching JSON array"
                     {:path "/provenance/whereare/" :body resp})))
-  (-> (into acc (map vector batch resp))
+  (-> (into acc (map vector batch (map #(provenance "/provenance/whereare/" %) resp)))
       (vary-meta merge (meta resp))))
 
 (defn whereare

@@ -290,7 +290,12 @@
         "the qualifiers are dropped")
     (testing "nil when the archive knows no provenance"
       (is (nil? (api/whereis cnt {:request (fake calls {:status 200 :headers {} :body "null"})})))
-      (is (nil? (api/whereis cnt {:request (fake calls {:status 404 :headers {} :body ""})}))))
+      (is (nil? (api/whereis cnt {:request (fake calls {:status 404 :headers {} :body ""})})))
+      (is (nil? (api/whereis cnt {:request (fake calls (json-response cnt))}))
+          "the bare SWHID names no origin"))
+    (testing "an answer that is no SWHID is an error"
+      (is (= (str "/provenance/whereis/" cnt "/")
+             (:path (ex-data (caught (api/whereis cnt {:request (fake calls (json-response {:a 1}))})))))))
     (testing "the permission is required"
       (is (= 403 (:status (ex-data (caught (api/whereis cnt {:request (fake calls {:status 403 :headers {} :body ""})})))))))))
 
@@ -300,7 +305,7 @@
                    (apply str (repeat 40 "1")))
         answer (fn [{:keys [body]}]
                  (let [ids (json/parse-string body)]
-                   (json-response (mapv #(when (= cnt %) found) ids))))]
+                   (json-response (mapv #(if (= cnt %) found %) ids))))]
     (is (= {cnt found dir nil}
            (api/whereare [(str cnt ";lines=1-2") dir]
                          {:request (fn [req] (swap! calls conj req) (answer req))})))
@@ -323,7 +328,9 @@
         (is (= 500 (:status (ex-data e))))
         (is (= 1000 (count (:partial (meta (ex-data e))))))))
     (testing "an answer that does not match the SWHIDs is an error"
-      (is (caught (api/whereare [cnt dir] {:request (fn [_] (json-response [found]))}))))))
+      (is (caught (api/whereare [cnt dir] {:request (fn [_] (json-response [found]))})))
+      (is (= "/provenance/whereare/"
+             (:path (ex-data (caught (api/whereare [cnt] {:request (fn [_] (json-response ["x"]))})))))))))
 
 ;; The one pure part the tests through :request do not cover.
 (deftest path-encode-test
