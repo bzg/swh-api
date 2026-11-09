@@ -105,7 +105,7 @@
                   path keywordize?))
 
 (defn- unless-404
-  "Calls `f`; nil when it throws a 404 (unknown origin)."
+  "Calls `f`; nil when it throws a 404 (unknown origin or artifact)."
   [f]
   (try
     (f)
